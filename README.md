@@ -23,6 +23,8 @@ DB3 Network is a Lightweight, *Permanent* JSON document database for Web3. It is
 
 # Have a try
 
+<img width="1200" src="./docs/images/986shots_so.jpg" align="center">
+
 ## Set up self-hosted Node
 
 **1. Start docker container**
@@ -32,6 +34,7 @@ sudo docker run -p 26639:26639 -p 26619:26619 -p 26629:26629 \
                 -e ADMIN_ADDR=0xF78c...29679 \ # use your own wallet address
                 -it ghcr.io/dbpunk-labs/db3:latest 
 ```
+
 you should see the following output
 ```
 start store node...
@@ -41,19 +44,18 @@ start ar testnet ...
 10000000000000Start the local db3 nodes successfully
 The storage node url: http://127.0.0.1:26619
 The index node url: http://127.0.0.1:26639
-The console node url: http://127.0.0.1:26629/console
-The setup url: http://127.0.0.1:26629/welcome
+The console url: http://127.0.0.1:26629
 ```
 
 **2. Setup the node**
 
-* open the `http://127.0.0.1:26629/welcome` to setup your node
-* open the `http://127.0.0.1:26629/console/database` to create database or collection
-* open the `http://127.0.0.1:26629/console/node/dashboard` to vist the dashboard
+* open the `http://127.0.0.1:26629/` to setup your node for the first time
+* open the `http://127.0.0.1:26629/database` to create database or collection
+* open the `http://127.0.0.1:26629/node/dashboard` to vist the dashboard
 
 **3. Playground**
 
-open the `http://127.0.0.1:26629/console/database` to create database or collection, then use the playgound `http://127.0.0.1:26629/console/database/playground` with the following code
+open the `http://127.0.0.1:26629/database` to create database or collection, then go the playgound
 
 ```typescript
 // create a account
@@ -81,15 +83,21 @@ if you have any questions, please feel free to ask us for help and you can find 
 * the doc about [queryDoc](https://docs.db3.network/functions/queryDoc.html)
 
 
-# Try Our Cloud Sandbox
+# Try the testnet
 
-* [Console](https://console.cloud.db3.network/console/home):https://console.cloud.db3.network/console/home
-* Data Rollup Node: https://rollup.cloud.db3.network
-* Data Index Node: https://index.cloud.db3.network
+## Try the testnet console
+[https://testnet.db3.network/home](https://testnet.db3.network/home)
+
+## Try the sdk
+| Public Chains   |      Testnet      |  Mainnet |
+|----------|:-------------:|:------:|
+| zksync   |data rollup node:`https://zksync.rollup.testnet.db3.network` <br> data index node:`https://zksync.index.testnet.db3.network`  | :soon: |
+| scroll   |data rollup node:`https://scroll.rollup.testnet.db3.network` <br> data index node:`https://scroll.index.testnet.db3.network`  | :soon: |
+
 
 You can connect to the Data Rollup Node and Data Index Node with db3.js
-
 Note: the cloud sandbox is just for testing and unstable
+
 
 # How it works
 
@@ -109,10 +117,11 @@ JSON document must be signed by its owner. Only the owner can update or delete t
 |----------|:-------------:|:------:|
 | Arweave |  :heavy_check_mark: | :heavy_check_mark:|
 | Polygon |   :heavy_check_mark: [Mumbai](https://mumbai.polygonscan.com/address/0xb9709cE5E749b80978182db1bEdfb8c7340039A9) |   :soon: |
-| Zksync | :soon: |   :soon: |
-| Scroll | :soon: |   :soon: |
+| Zksync | :heavy_check_mark:[testnet](https://goerli.explorer.zksync.io/address/0xB4Ec19674A67dB002fFDeB83e14f9849DA3D1020) |   :soon: |
+| Scroll | :heavy_check_mark: [alpha](https://scroll.l2scan.co/address/0x91B4BB6c2e6F70F93D89B04c049bFB2D36839d9A) |   :soon: |
 | Arbitrum | :soon: |   :soon: |
 | Optimism | :soon: |   :soon: |
+| Linea| :heavy_check_mark: [testnet](https://goerli.lineascan.build/address/0xfFe5128735D2EFC1bFDF2eD18A99D1eD8d096D94) | :soon: |
 
 If you want us to support the other public chains, just give us an [issue](https://github.com/dbpunk-labs/db3/issues/new?assignees=&labels=enhancement&projects=&template=feature_request.md&title=)
 
@@ -123,12 +132,15 @@ Now building a fully on-chain application is an easy thing. You can create a ful
 # FAQ
 
 Q: Is the DB3 Network a blockchain?
+
 A: No, the DB3 Network is not a blockchain. It is simply a developer tool that can be hosted locally or used through our cloud service.
 
 Q: What are the differences between MongoDB and DB3 Network?
+
 A: MongoDB uses centralized data storage, whereas DB3 Network uses decentralized data storage. Additionally, DB3 Network ensures that data is permanently available.
 
 Q: Will my data be lost if the Data Rollup Node or Data Index Node is not available?
+
 A: No, you can set up your data index node and recover your data from the blockchain.
 
 # License

@@ -40,6 +40,7 @@ async function runQueryInternal<T>(col: Collection, query: Query) {
             id: doc.id,
         } as DocumentEntry<T>
     })
+
     return {
         docs: entries,
         collection: col,
@@ -92,7 +93,7 @@ async function runQueryInternal<T>(col: Collection, query: Query) {
  * @param col        - the instance of collection
  * @param queryStr   - a document query string
  * @param parameters - an optional query parameters
- * @returns the {@link Queryresult}
+ * @returns the {@link QueryResult}
  *
  **/
 export async function queryDoc<T = DocumentData>(
@@ -112,6 +113,35 @@ export async function queryDoc<T = DocumentData>(
             parameters,
         }
         return runQueryInternal<T>(col, query)
+    }
+}
+
+/**
+ *
+ * This function gets a document from the database by its ID.
+ *
+ * ```ts
+ * const doc = await getDoc(collection, "10")
+ * const id = doc.id
+ * const content = doc.doc
+ * ```
+ * @param col    - the instance of collection
+ * @param id     - the id of document
+ * @returns the {@link DocumentEntry} if the document was found. Otherwise, raises an error.
+ **/
+export async function getDoc<T = DocumentData>(col: Collection, id: string) {
+    const response = await col.db.client.indexer.getDoc(
+        col.db.addr,
+        col.name,
+        id
+    )
+    if (response.document) {
+        return {
+            doc: JSON.parse(response.document.doc) as T,
+            id: response.document.id,
+        } as DocumentEntry<T>
+    } else {
+        throw new Error('no document was found with id ' + id)
     }
 }
 
@@ -195,6 +225,13 @@ export async function updateDoc(
     }
 }
 
+/**
+ * Add a document to the collection.
+ *
+ * @param col The collection to add the document to.
+ * @param doc The document to add.
+ * @returns The ID of the newly added document.
+ */
 export async function addDoc(col: Collection, doc: DocumentData) {
     const documentMutation: DocumentMutation = {
         collectionName: col.name,
@@ -220,6 +257,7 @@ export async function addDoc(col: Collection, doc: DocumentData) {
         payload,
         col.db.client.nonce.toString()
     )
+
     if (response.code == 0 && response.items.length > 0) {
         col.db.client.nonce += 1
         return {
@@ -229,6 +267,8 @@ export async function addDoc(col: Collection, doc: DocumentData) {
             id: response.items[0].value,
         }
     } else {
-        throw new Error('fail to create collection')
+        throw new Error(
+            'fail to addDoc, maybe you can syncAccountNonce to resolve the problem'
+        )
     }
 }

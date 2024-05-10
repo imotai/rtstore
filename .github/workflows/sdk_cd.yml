@@ -9,15 +9,18 @@ jobs:
         runs-on: ubuntu-latest
         steps:
             - name: checkout db3.js
-              uses: actions/checkout@v3
+              uses: actions/checkout@v4
               with:
                   submodules: recursive
-            - uses: actions/setup-node@v3.7.0
+            - uses: actions/setup-node@v4.0.2
               with:
                   node-version: "16.x"
-            - uses: CultureHQ/actions-yarn@v1.0.1
-            - run: |
-                cd sdk && yarn && make &&  yarn build
+            - name: build sdk
+              run: |
+                TAG=${GITHUB_REF/refs\/tags\//}
+                VERSION=${TAG#*v}
+                echo ${VERSION}
+                cd sdk && yarn version --new-version ${VERSION} && yarn && make &&  yarn build
             - uses: JS-DevTools/npm-publish@v2
               with:
                   token: ${{ secrets.NMP_TOKEN }}

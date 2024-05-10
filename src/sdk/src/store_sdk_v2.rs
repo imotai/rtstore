@@ -105,16 +105,23 @@ impl StoreSDKV2 {
         client.subscribe(req).await
     }
 
+    pub async fn get_blocks(
+        &self,
+        block_start: u64,
+        block_end: u64,
+    ) -> Result<tonic::Response<BlockResponseV2>, Status> {
+        let req = BlockRequestV2 {
+            block_start,
+            block_end,
+        };
+        let mut client = self.client.as_ref().clone();
+        client.get_block(req).await
+    }
     pub async fn get_block_by_height(
         &self,
         height: u64,
     ) -> Result<tonic::Response<BlockResponseV2>, Status> {
-        let req = BlockRequestV2 {
-            block_start: height,
-            block_end: height + 1,
-        };
-        let mut client = self.client.as_ref().clone();
-        client.get_block(req).await
+        self.get_blocks(height, height + 1).await
     }
 }
 

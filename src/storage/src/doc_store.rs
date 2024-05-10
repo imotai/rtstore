@@ -17,8 +17,7 @@
 
 use db3_crypto::db3_address::DB3Address;
 use db3_error::{DB3Error, Result};
-use db3_proto::db3_database_v2_proto::{query_parameter, Query};
-use db3_proto::db3_mutation_v2_proto::CollectionMutation;
+use db3_proto::db3_database_v2_proto::{query_parameter, Index, Query};
 use ejdb2::SetPlaceholder;
 use ejdb2::{EJDBQuery, EJDB};
 use moka::sync::Cache;
@@ -102,13 +101,8 @@ impl DocStore {
         }
     }
 
-    pub fn create_collection(
-        &self,
-        db_addr: &DB3Address,
-        collection: &CollectionMutation,
-    ) -> Result<()> {
-        //TODO validata the db address
-        if collection.index_fields.len() > 0 {
+    pub fn add_index(&self, db_addr: &DB3Address, name: &str, indexes: &Vec<Index>) -> Result<()> {
+        if indexes.len() > 0 {
             let key = db_addr.as_ref().to_vec();
             let add_addr_clone = db_addr.clone();
             let db_root_path = self.config.db_root_path.to_string();
@@ -120,11 +114,11 @@ impl DocStore {
                 }
             });
             if let Some(entry) = db_entry {
-                for field in &collection.index_fields {
+                for field in indexes {
                     entry
                         .value()
                         .ensure_index(
-                            collection.collection_name.as_str(),
+                            name,
                             field.path.as_str(),
                             EJDB_INDEX[field.index_type as usize],
                         )
@@ -243,18 +237,15 @@ impl DocStore {
         }
     }
 
-    pub fn get_doc(&self, db_addr: &DB3Address, col_name: &str, id: i64) -> Result<String> {
+    pub fn get_doc(&self, db_addr: &DB3Address, col_name: &str, id: i64) -> Result<Option<String>> {
         let db_opt = self.get_db_ref(db_addr);
         if let Some(db) = db_opt {
             let opt = db
                 .get::<String>(col_name, id)
                 .map_err(|e| DB3Error::WriteStoreError(format!("{e}")))?;
-            Ok(opt)
+            Ok(Some(opt))
         } else {
-            Err(DB3Error::WriteStoreError(format!(
-                "no database found with addr {}",
-                db_addr.to_hex()
-            )))
+            Ok(None)
         }
     }
 
@@ -338,14 +329,11 @@ mod tests {
         let doc_store = DocStore::new(config).unwrap();
         let db_id_ret = doc_store.create_database(&DB3Address::ZERO);
         assert!(db_id_ret.is_ok());
-        let collection = CollectionMutation {
-            index_fields: vec![Index {
-                path: "/f1".to_string(),
-                index_type: IndexType::StringKey.into(),
-            }],
-            collection_name: "col1".to_string(),
-        };
-        let result = doc_store.create_collection(&DB3Address::ZERO, &collection);
+        let indexes = vec![Index {
+            path: "/f1".to_string(),
+            index_type: IndexType::StringKey.into(),
+        }];
+        let result = doc_store.add_index(&DB3Address::ZERO, "col1", &indexes);
         assert!(result.is_ok());
         let doc_str = r#"{"f2":"f2", "f1":"f1"}"#;
         let id = doc_store
@@ -358,7 +346,7 @@ mod tests {
     fn doc_get_test() {
         let (doc_store, id) = prepare_the_dataset();
         let doc_str = r#"{"f2":"f2", "f1":"f1"}"#;
-        if let Ok(value) = doc_store.get_doc(&DB3Address::ZERO, "col1", id) {
+        if let Ok(Some(value)) = doc_store.get_doc(&DB3Address::ZERO, "col1", id) {
             let value: serde_json::Value = serde_json::from_str(value.as_str()).unwrap();
             let right: serde_json::Value = serde_json::from_str(doc_str).unwrap();
             assert_eq!(value, right);
@@ -426,7 +414,7 @@ mod tests {
     fn doc_store_smoke_test() {
         let (doc_store, id) = prepare_the_dataset();
         let db_id = DB3Address::ZERO;
-        if let Ok(value) = doc_store.get_doc(&db_id, "col1", id) {
+        if let Ok(Some(value)) = doc_store.get_doc(&db_id, "col1", id) {
             println!("{}", value.as_str());
             let value: serde_json::Value = serde_json::from_str(value.as_str()).unwrap();
             assert_eq!(value["f1"].as_str(), Some("f1"));
@@ -484,7 +472,7 @@ mod tests {
             assert!(false);
         }
 
-        if let Ok(value) = doc_store.get_doc(&db_id, "col1", id) {
+        if let Ok(Some(value)) = doc_store.get_doc(&db_id, "col1", id) {
             let value: serde_json::Value = serde_json::from_str(value.as_str()).unwrap();
             assert_eq!(value["test"].as_str(), Some("v2"));
         } else {

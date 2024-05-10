@@ -1,6 +1,6 @@
 [package]
 name = "db3-node"
-version = "0.1.0"
+version = "0.4.2"
 edition = "2021"
 
 [[bin]]
@@ -10,14 +10,14 @@ path = "src/main.rs"
 [dependencies]
 bytes = { version = "1.4", default-features = false }
 flex-error = { version = "0.4.4", default-features = false }
-db3-proto={path="../proto", version="0.1.0"}
-db3-crypto={path="../crypto", version="0.1.0"}
-db3-storage={path="../storage", version="0.1.0"}
-db3-base={path="../base", version="0.1.0"}
-db3-error={path="../error", version="0.1.0"}
-db3-cmd={path="../cmd", version="0.1.0"}
-db3-sdk={path="../sdk", version="0.1.0"}
-db3-event={path="../event", version="0.1.0"}
+db3-proto={path="../proto"}
+db3-crypto={path="../crypto"}
+db3-storage={path="../storage"}
+db3-base={path="../base"}
+db3-error={path="../error"}
+db3-cmd={path="../cmd"}
+db3-sdk={path="../sdk"}
+db3-event={path="../event"}
 ethers = { workspace = true }
 tonic = { workspace = true }
 tonic-web = { workspace = true }
@@ -29,12 +29,12 @@ rand = "0.8.5"
 tempdir = "0.3.7"
 serde_json = { workspace=true}
 prost = "0.11"
-prost-types = "0.11"
+prost-types = "0.12"
 tokio = { version = "1.17.0", features = ["full"] }
 tokio-stream = "0.1.12"
 clap = { version = "4.0.20", features = ["derive"] }
 http = "0.2"
-shadow-rs = "0.23.0"
+shadow-rs = "0.25.0"
 tower-http = { version = "0.4", features = ["cors"] }
 ctrlc = { version = "3.0", features = ["termination"] }
 dirs = "5.0.0"
@@ -45,4 +45,4 @@ arweave-rs = {workspace=true}
 url = "2.4.0"
 arc-swap = "1.6.0"
 [build-dependencies]
-shadow-rs = "0.23.0"
+shadow-rs = "0.25.0"

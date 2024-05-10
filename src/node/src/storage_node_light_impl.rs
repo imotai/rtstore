@@ -21,6 +21,7 @@ use db3_base::strings;
 use db3_crypto::db3_address::DB3Address;
 use db3_crypto::id::TxId;
 use db3_error::{DB3Error, Result};
+use db3_event::meta_store_event_processor::MetaStoreEventProcessor;
 use db3_proto::db3_mutation_v2_proto::{MutationAction, MutationRollupStatus};
 use db3_proto::db3_storage_proto::block_response;
 use db3_proto::db3_storage_proto::event_message::Event as EventV2;
@@ -34,8 +35,6 @@ use db3_proto::db3_storage_proto::{
     ScanMutationHeaderResponse, ScanRollupRecordRequest, ScanRollupRecordResponse,
     SendMutationRequest, SendMutationResponse, SubscribeRequest,
 };
-
-use db3_event::meta_store_event_processor::MetaStoreEventProcessor;
 use db3_proto::db3_storage_proto::{
     BlockEvent as BlockEventV2, EventMessage as EventMessageV2, EventType as EventTypeV2,
     Subscription as SubscriptionV2,
@@ -104,7 +103,12 @@ impl StorageNodeV2Impl {
         storage.recover()?;
         let db_store = DBStoreV2::new(config.db_store_config.clone())?;
         let (broadcast_sender, _) = broadcast::channel(1024);
-        let event_processor = Arc::new(MetaStoreEventProcessor::new(state_store.clone()));
+        let event_processor = Arc::new(MetaStoreEventProcessor::new(
+            state_store.clone(),
+            db_store.clone(),
+            storage.clone(),
+            system_store.clone(),
+        ));
         if let Some(c) = system_store.get_config(&SystemRole::DataRollupNode)? {
             info!("init storage node from persistence config {:?}", c);
             let network_id = Arc::new(AtomicU64::new(c.network_id));
@@ -117,7 +121,13 @@ impl StorageNodeV2Impl {
                 .await?,
             );
             event_processor
-                .start(c.contract_addr.as_str(), c.evm_node_url.as_str(), 0)
+                .start(
+                    c.contract_addr.as_str(),
+                    c.evm_node_url.as_str(),
+                    0,
+                    c.chain_id,
+                    c.network_id,
+                )
                 .await?;
             let rollup_interval = c.rollup_interval;
             Ok(Self {
@@ -170,6 +180,27 @@ impl StorageNodeV2Impl {
     pub async fn start_bg_task(&self) {
         self.start_to_produce_block().await;
         self.start_to_rollup().await;
+        self.start_flush_state().await;
+    }
+
+    async fn start_flush_state(&self) {
+        let local_db_store = self.db_store.clone();
+        let local_running = self.running.clone();
+        task::spawn(async move {
+            info!("start the database meta flush thread");
+            while local_running.load(Ordering::Relaxed) {
+                sleep(TokioDuration::from_millis(60000)).await;
+                match local_db_store.flush_database_state() {
+                    Ok(_) => {
+                        info!("flush database meta done");
+                    }
+                    Err(e) => {
+                        warn!("flush database meta error {e}");
+                    }
+                }
+            }
+            info!("exit the flush thread");
+        });
     }
 
     async fn start_to_produce_block(&self) {
@@ -275,7 +306,7 @@ impl StorageNodeV2Impl {
                                 info!("update the network {} and rollup interval {}", local_network_id.load(Ordering::Relaxed),
                                 local_rollup_interval.load(Ordering::Relaxed)
                                 );
-                                if let Err(e) = local_event_processor.start(c.contract_addr.as_str(), c.evm_node_url.as_str(), 0).await {
+                                if let Err(e) = local_event_processor.start(c.contract_addr.as_str(), c.evm_node_url.as_str(), 0, c.chain_id, c.network_id).await {
                                     warn!("fail update the event processor with error {e}");
                                 }
                             }
@@ -585,6 +616,7 @@ impl StorageNode for StorageNodeV2Impl {
     ) -> std::result::Result<Response<SendMutationResponse>, Status> {
         let network = self.network_id.load(Ordering::Relaxed);
         if network == 0 {
+            warn!("setup the node first");
             return Err(Status::internal(
                 "the system has not been setup".to_string(),
             ));
@@ -595,18 +627,21 @@ impl StorageNode for StorageNodeV2Impl {
             r.signature.as_str(),
         )
         .map_err(|e| {
+            warn!("invalid signature for error {e}");
             Status::invalid_argument(format!("fail to verify the payload and signature {e}"))
         })?;
         let action = MutationAction::from_i32(dm.action)
-            .ok_or(Status::internal("fail to convert action type".to_string()))?;
-        // TODO validate the database mutation
+            .ok_or(Status::invalid_argument("bad mutation action".to_string()))?;
         match self.state_store.incr_nonce(&address, nonce) {
             Ok(_) => {
                 // mutation id
                 let (id, block, order) = self
                     .storage
                     .generate_mutation_block_and_order(&r.payload, r.signature.as_str())
-                    .map_err(|e| Status::internal(format!("{e}")))?;
+                    .map_err(|e| {
+                        warn!("fail to generate the block and order for {e}");
+                        Status::internal(format!("{e}"))
+                    })?;
                 let response = match self.db_store.apply_mutation(
                     action,
                     dm,
@@ -619,7 +654,6 @@ impl StorageNode for StorageNodeV2Impl {
                 ) {
                     Ok(items) => {
                         let doc_ids_map = MutationUtil::get_create_doc_ids_map(&items);
-
                         self.storage
                             .add_mutation(
                                 &r.payload,
@@ -632,7 +666,10 @@ impl StorageNode for StorageNodeV2Impl {
                                 network,
                                 action,
                             )
-                            .map_err(|e| Status::internal(format!("{e}")))?;
+                            .map_err(|e| {
+                                warn!("fail to add mutation for error {e}");
+                                Status::internal(format!("{e}"))
+                            })?;
                         Response::new(SendMutationResponse {
                             id,
                             code: 0,
@@ -643,6 +680,7 @@ impl StorageNode for StorageNodeV2Impl {
                         })
                     }
                     Err(e) => {
+                        warn!("fail to apply mutation for error {e}");
                         return Err(Status::internal(format!("{e}")));
                     }
                 };
@@ -680,6 +718,7 @@ mod tests {
         let rollup_config = RollupExecutorConfig {
             temp_data_path: format!("{real_path}/data_path"),
             key_root_path: format!("{real_path}/keys"),
+            use_legacy_tx: false,
         };
 
         let system_store_config = SystemStoreConfig {
